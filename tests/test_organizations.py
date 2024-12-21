@@ -16,11 +16,6 @@ def test_user(db: Session):
         db.refresh(user)
     return user
 
-@pytest.fixture
-def auth_headers(test_user):
-    token = create_access_token(test_user.id)
-    return {"Authorization": f"Bearer {token}"}
-
 def test_create_organization(client, test_user, db: Session):
     response = client.post("/api/v1/organizations/", json={"name": "Test Organization"}, headers={"Authorization": f"Bearer {test_user.id}"})
     assert response.status_code == 200

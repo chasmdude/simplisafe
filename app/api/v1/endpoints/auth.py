@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
-from app.core import deps, security
-from app.schemas.user import UserCreate, User
-from app.models.user import User as UserModel
+
+from app.core import deps
 from app.core.security import verify_password, get_password_hash
+from app.models.user import User as UserModel
+from app.schemas.user import UserCreate, User, UserLogin
 
 router = APIRouter()
 
@@ -12,14 +13,13 @@ router = APIRouter()
 async def login(
         request: Request,
         response: Response,
-        username: str,
-        password: str,
+        user_in: UserLogin,
         db: Session = Depends(deps.get_db)
 ):
     """
     Login a user using their username and password, set user_id in session.
     """
-    user = db.query(UserModel).filter(UserModel.username == username).first()
+    user = db.query(UserModel).filter(UserModel.username == user_in.username).first()
 
     if not user:
         raise HTTPException(
@@ -27,7 +27,7 @@ async def login(
             detail="User not found"
         )
 
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid password"
@@ -83,5 +83,12 @@ async def logout(request: Request):
     """
     Log out the user by clearing the session.
     """
-    request.session.clear()
-    return {"message": "Successfully logged out"}
+    # Clear the session to log out the user
+    if "user_id" in request.session:
+        request.session.clear()
+        return {"message": "Successfully logged out"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active session to log out from"
+        )

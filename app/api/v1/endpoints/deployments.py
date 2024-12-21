@@ -52,9 +52,9 @@ def create_deployment(
         for deployment in preempted_deployments:
             # Check if preempted deployment can be stopped
             if (
-                    cluster.cpu_available >= deployment_in.cpu_required
-                    and cluster.ram_available >= deployment_in.ram_required
-                    and cluster.gpu_available >= deployment_in.gpu_required
+                    cluster.cpu_available + deployment.cpu_required >= deployment_in.cpu_required
+                    and cluster.ram_available + deployment.ram_required >= deployment_in.ram_required
+                    and cluster.gpu_available + deployment.gpu_required >= deployment_in.gpu_required
             ):
                 # Free resources by marking deployment as failed
                 deployment.status = DeploymentStatus.FAILED
