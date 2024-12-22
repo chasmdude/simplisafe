@@ -8,28 +8,7 @@ from app.models.cluster import Cluster as ClusterModel
 from app.models.organization import Organization as OrganizationModel
 from app.models.organization_member import OrganizationMember
 from app.models.user import User as UserModel
-from tests.conftest import BaseTest, login_user, create_user
-
-
-def add_user_to_org(db: Session, organization_id: int, user_id: int, role: str = "member"):
-    """
-    Helper function to add a user to an organization with a specific role.
-    """
-    organization_member = OrganizationMember(user_id=user_id, organization_id=organization_id, role=role)
-    db.add(organization_member)
-    db.commit()
-
-
-def create_organization(db: Session, name: str, user_id: int) -> OrganizationModel:
-    """
-    Helper function to create an organization and add the user as an admin.
-    """
-    organization = OrganizationModel(name=name, invite_code=OrganizationModel.generate_invite_code())
-    db.add(organization)
-    db.commit()
-    db.refresh(organization)
-    add_user_to_org(db, organization.id, user_id, role="admin")
-    return organization
+from tests.conftest import BaseTest, login_user, create_test_user_model, create_organization_with_user_as_admin
 
 
 def create_cluster(client: TestClient, cookies: dict, cluster_data: dict) -> Response:
@@ -46,8 +25,6 @@ def list_clusters(client: TestClient, cookies: dict) -> Response:
     """
     response = client.get("/clusters/", cookies=cookies)
     return response
-
-
 #
 # def create_user(db, username, email, password):
 #     hashed_password = get_password_hash(password)
@@ -77,25 +54,26 @@ def list_clusters(client: TestClient, cookies: dict) -> Response:
 #     add_user_to_org(db, organization.id, user_id, role="admin")
 #     return organization
 
-
 class TestCluster(BaseTest):
     @pytest.fixture(autouse=True)
     def setup_and_teardown(self, db: Session):
         # Setup: Ensure the database is clean before each test
         db.query(ClusterModel).delete()
         db.query(OrganizationModel).delete()
+        db.query(OrganizationMember).delete()
         db.query(UserModel).delete()
         db.commit()
 
         # Create test user and organization
-        self.create_test_user = create_user(db, "testuser", "testuser@example.com", "Testpassword1!")
-        self.create_test_org = create_organization(db, "test-organization", self.create_test_user.id)
+        self.create_test_user = create_test_user_model(db, "testuser", "testuser@example.com", "Testpassword1!")
+        self.create_test_org = create_organization_with_user_as_admin(db, "test-organization", self.create_test_user.id)
 
         yield
 
         # Teardown: Clean up the database after each test
         db.query(ClusterModel).delete()
         db.query(OrganizationModel).delete()
+        db.query(OrganizationMember).delete()
         db.query(UserModel).delete()
         db.commit()
 
@@ -151,7 +129,7 @@ class TestCluster(BaseTest):
 
     def test_create_cluster_user_not_in_org(self, client: TestClient, db: Session):
         # Create a user who is not part of any organization
-        user_not_in_org = create_user(db, "usernotinorg", "usernotinorg@example.com", "Testpassword1!")
+        user_not_in_org = create_test_user_model(db, "usernotinorg", "usernotinorg@example.com", "Testpassword1!")
         cookies = login_user(client, user_not_in_org.username, "Testpassword1!")
 
         cluster_data = {
@@ -217,7 +195,7 @@ class TestCluster(BaseTest):
 
     def test_list_clusters_user_not_in_org(self, client: TestClient, db: Session):
         # Create a user who is not part of any organization
-        user_not_in_org = create_user(db, "usernotinorg", "usernotinorg@example.com", "Testpassword1!")
+        user_not_in_org = create_test_user_model(db, "usernotinorg", "usernotinorg@example.com", "Testpassword1!")
         cookies = login_user(client, user_not_in_org.username, "Testpassword1!")
 
         response = list_clusters(client, cookies)

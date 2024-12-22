@@ -6,21 +6,7 @@ from app.core.security import get_password_hash
 from app.models.organization import Organization as OrganizationModel
 from app.models.organization_member import OrganizationMember
 from app.models.user import User as UserModel
-from tests.conftest import BaseTest, create_user, login_user
-
-
-def create_test_org(db):
-    organization = OrganizationModel(name="test-organization", invite_code=OrganizationModel.generate_invite_code())
-    db.add(organization)
-    db.commit()
-    db.refresh(organization)
-    return organization
-
-
-def add_user_to_org(db, organization_id, user_id, role="member"):
-    organization_member = OrganizationMember(user_id=user_id, organization_id=organization_id, role=role)
-    db.add(organization_member)
-    db.commit()
+from tests.conftest import BaseTest, create_test_user_model, login_user, create_test_org, add_user_to_org
 
 
 def create_organization(client: TestClient, cookies, name: str):
@@ -73,16 +59,16 @@ class TestOrganization(BaseTest):
     @pytest.fixture(autouse=True)
     def setup_and_teardown(self, db: Session):
         # Setup: Ensure the database is clean before each test
-        db.query(OrganizationMember).delete()
         db.query(OrganizationModel).delete()
+        db.query(OrganizationMember).delete()
         db.query(UserModel).delete()
         db.commit()
 
-        self.create_test_user = create_user(db, "testuser", "testuser@example.com", "Testpassword1!")
+        self.create_test_user = create_test_user_model(db, "testuser", "testuser@example.com", "Testpassword1!")
         yield
         # Teardown: Clean up the database after each test
-        db.query(OrganizationMember).delete()
         db.query(OrganizationModel).delete()
+        db.query(OrganizationMember).delete()
         db.query(UserModel).delete()
         db.commit()
 

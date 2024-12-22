@@ -12,7 +12,7 @@ from app.models.deployment import Deployment as DeploymentModel
 
 # Redis connection setup
 redis_client = redis.StrictRedis(host="localhost", port=6379, db=0)
-
+#
 # def deployment_scheudler():
 #     while True:
 #         task = redis_client.blpop("deployment_queue")  # Blocking pop from the queue
@@ -44,6 +44,9 @@ redis_client = redis.StrictRedis(host="localhost", port=6379, db=0)
 #         deploy_status = DeploymentStatus.RUNNING
 #     else:
 #         deploy_status = DeploymentStatus.PENDING
+#         # Optionally retry the deployment after some time
+#         sleep(10)
+#         return process_deployment(deployment_in)
 #
 #     # Create the deployment record
 #     deployment = DeploymentModel(
@@ -103,6 +106,8 @@ def check_for_new_clusters(db: Session):
     """
     Periodically check for new clusters and add corresponding queues if they don't exist.
     """
+    db: Session = next(deps.get_db())  # Get the database session
+
     # Get all clusters from the database
     clusters = db.query(Cluster).all()
 
@@ -122,7 +127,8 @@ def check_for_new_clusters(db: Session):
 # Start the background scheduler for periodic check
 def start_periodic_task():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(check_for_new_clusters, 'interval', seconds=30)  # Check every 30 seconds
+    db = deps.get_db()  # Get the database session
+    scheduler.add_job(check_for_new_clusters, 'interval', seconds=30, args=[db])  # Pass the db session as an argument
     scheduler.start()
 
     print("Scheduler started for checking new clusters periodically.")

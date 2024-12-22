@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from app.core.security import get_password_hash
 from app.models.user import User as UserModel
-from tests.conftest import BaseTest, create_user
+from tests.conftest import BaseTest, create_test_user_model
 
 
 class TestAuth(BaseTest):
@@ -14,7 +14,7 @@ class TestAuth(BaseTest):
         db.query(UserModel).delete()
         db.commit()
 
-        self.create_test_user = create_user(db, "testuser", "testuser@example.com", "Testpassword1!")
+        self.create_test_user = create_test_user_model(db, "testuser", "testuser@example.com", "Testpassword1!")
         yield
         # Teardown: Clean up the database after each test
         db.query(UserModel).delete()
