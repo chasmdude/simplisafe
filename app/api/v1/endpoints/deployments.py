@@ -1,5 +1,8 @@
 from typing import List
+
+import redis
 from fastapi import APIRouter, Depends, HTTPException, status
+from rq import Queue
 from sqlalchemy.orm import Session
 
 from app.core import deps
@@ -8,10 +11,17 @@ from app.models.deployment import Deployment as DeploymentModel, DeploymentStatu
 from app.models.user import User
 from app.schemas.deployment import Deployment, DeploymentCreate
 
+# Connect to Redis
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+deployment_queue = Queue('deployment_queue', connection=redis_client)
+
 router = APIRouter()
 
 
-@router.post("/", response_model=Deployment)
+@router.post("/", response_model=Deployment, responses={
+    200: {"description": "Deployment created successfully", "content": {"application/json": {"example": {"id": 1, "name": "Deployment1", "docker_image": "my_image", "cpu_required": 2, "ram_required": 4, "gpu_required": 1, "priority": 1, "status": "running", "cluster_id": 1}}}},
+    404: {"description": "Cluster not found", "content": {"application/json": {"example": {"detail": "Cluster not found"}}}},
+})
 def create_deployment(
         *,
         db: Session = Depends(deps.get_db),
@@ -70,6 +80,8 @@ def create_deployment(
         if not resources_freed:
             # If resources are still not enough, queue the deployment
             deploy_status = DeploymentStatus.PENDING
+            # Add the deployment to the Redis queue for this cluster
+            redis_client.rpush(f"deployment_queue_{deployment_in.cluster_id}", deployment_in.name)
 
         else:
             # If resources are freed, proceed with running the new deployment
@@ -98,8 +110,11 @@ def create_deployment(
     return deployment
 
 
-# app/api/v1/endpoints/deployments.py
-@router.get("/", response_model=List[Deployment])
+@router.get("/", response_model=List[Deployment], responses={
+    200: {"description": "List of deployments for the user's organization", "content": {"application/json": {"example": [{"id": 1, "name": "Deployment1", "docker_image": "my_image", "cpu_required": 2, "ram_required": 4, "gpu_required": 1, "priority": 1, "status": "running", "cluster_id": 1}]}}},
+    400: {"description": "User is not part of any organization", "content": {"application/json": {"example": {"detail": "User is not part of any organization"}}}},
+    404: {"description": "No deployments found", "content": {"application/json": {"example": {"detail": "No deployments found for your organization"}}}},
+})
 def list_deployments(
         db: Session = Depends(deps.get_db),
         current_user: User = Depends(deps.get_current_user)

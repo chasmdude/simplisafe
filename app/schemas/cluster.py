@@ -9,7 +9,7 @@ class ClusterBase(BaseModel):
 
 
 class ClusterCreate(ClusterBase):
-    organization_id: int
+    pass
 
 
 class ClusterUpdate(ClusterBase):

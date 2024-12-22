@@ -14,6 +14,7 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 class CustomTestClient(TestClient):
     def __init__(self, app, base_path: str, **kwargs):
         super().__init__(app, **kwargs)
@@ -22,6 +23,32 @@ class CustomTestClient(TestClient):
     def request(self, method: str, url: str, **kwargs):
         url = f"{self.base_path}{url}"
         return super().request(method, url, **kwargs)
+
+
+def create_user(db, username: str, email: str, password: str) -> UserModel:
+    """
+    Helper function to create a user in the database.
+    """
+    hashed_password = get_password_hash(password)
+    user = UserModel(
+        username=username,
+        email=email,
+        hashed_password=hashed_password,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def login_user(client: TestClient, username: str, password: str):
+    response = client.post(
+        "/auth/login",
+        json={"username": username, "password": password}
+    )
+    assert response.status_code == 200
+    return response.cookies
 
 class BaseTest:
     base_path = "/api/v1"  # Set the base path here
@@ -36,6 +63,7 @@ class BaseTest:
     @pytest.fixture(scope="session")
     def client(self):
         """Override the FastAPI dependency to use the test database session."""
+
         def override_get_db():
             try:
                 db = TestingSessionLocal()
@@ -46,18 +74,3 @@ class BaseTest:
         app.dependency_overrides[get_db] = override_get_db
         with CustomTestClient(app, self.base_path) as client:
             yield client
-
-    @pytest.fixture(scope="module")
-    def create_user(self, db):
-        """Helper function to create a user in the test database."""
-        hashed_password = get_password_hash("testpassword")
-        user = UserModel(
-            username="testuser",
-            email="testuser@example.com",
-            hashed_password=hashed_password,
-            is_active=True
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        return user

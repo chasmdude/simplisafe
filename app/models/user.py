@@ -8,9 +8,7 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
-    organization_id = Column(Integer, ForeignKey("organization.id"))
-    
+
     # Relationships
-    organization = relationship("Organization", back_populates="users")
-    memberships = relationship("OrganizationMember", back_populates="user")
+    organization = relationship("OrganizationMember", back_populates="user", cascade="all, delete-orphan", uselist=False)
 

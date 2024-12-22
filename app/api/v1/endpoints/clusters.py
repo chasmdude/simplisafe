@@ -8,7 +8,10 @@ from app.models.cluster import Cluster as ClusterModel  # Import the Cluster mod
 
 router = APIRouter()
 
-@router.post("/", response_model=Cluster)
+@router.post("/", response_model=Cluster, responses={
+    200: {"description": "Cluster created successfully", "content": {"application/json": {"example": {"id": 1, "name": "Cluster1", "cpu_limit": 4, "ram_limit": 16, "gpu_limit": 1, "organization_id": 1}}}},
+    400: {"description": "User is not part of any organization", "content": {"application/json": {"example": {"detail": "User is not part of any organization"}}}},
+})
 def create_cluster(
     *,
     db: Session = Depends(deps.get_db),
@@ -19,11 +22,13 @@ def create_cluster(
     Create a new cluster associated with the current user.
     """
     # Check if the user has an active organization
-    if not current_user.memberships:
+    if not current_user.organization:
         raise HTTPException(
             status_code=400,
             detail="User is not part of any organization"
         )
+
+    current_user_org_id = current_user.organization.id
 
     # Create a new Cluster instance with the provided resources and limits
     cluster = ClusterModel(
@@ -34,7 +39,7 @@ def create_cluster(
         cpu_available=cluster_in.cpu_limit,  # Initially, all resources are available
         ram_available=cluster_in.ram_limit,
         gpu_available=cluster_in.gpu_limit,
-        organization_id=current_user.organization_id,  # Assign the current user's organization ID
+        organization_id=current_user_org_id,  # Assign the current user's organization ID
     )
 
     db.add(cluster)
@@ -44,7 +49,10 @@ def create_cluster(
     return cluster
 
 
-@router.get("/", response_model=List[Cluster])
+@router.get("/", response_model=List[Cluster], responses={
+    200: {"description": "List of clusters for the user's organization", "content": {"application/json": {"example": [{"id": 1, "name": "Cluster1", "cpu_limit": 4, "ram_limit": 16, "gpu_limit": 1, "organization_id": 1}]}}},
+    400: {"description": "User is not part of any organization", "content": {"application/json": {"example": {"detail": "User is not part of any organization"}}}}
+})
 def list_clusters(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user)
@@ -62,10 +70,10 @@ def list_clusters(
     # Retrieve clusters for the user's organization
     clusters = db.query(ClusterModel).filter(ClusterModel.organization_id == current_user.organization.id).all()
 
-    if not clusters:
-        raise HTTPException(
-            status_code=404,
-            detail="No clusters found for your organization"
-        )
+    # if not clusters:
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail="No clusters found for your organization"
+    #     )
 
     return clusters

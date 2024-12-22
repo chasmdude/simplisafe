@@ -9,37 +9,9 @@ from app.schemas.user import UserCreate, User, UserLogin
 router = APIRouter()
 
 
-@router.post("/login")
-async def login(
-        request: Request,
-        response: Response,
-        user_in: UserLogin,
-        db: Session = Depends(deps.get_db)
-):
-    """
-    Login a user using their username and password, set user_id in session.
-    """
-    user = db.query(UserModel).filter(UserModel.username == user_in.username).first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-
-    if not verify_password(user_in.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid password"
-        )
-
-    # Store the user ID in the session to track the logged-in user
-    request.session["user_id"] = user.id
-    response.status_code = status.HTTP_200_OK
-    return {"message": "Login successful", "user_id": user.id}
-
-
-@router.post("/register", response_model=User)
+@router.post("/register", response_model=User, responses={
+    400: {"description": "Username or email already exists", "content": {"application/json": {"example": {"detail": "Username or email already exists"}}}},
+})
 async def register(
         *,
         db: Session = Depends(deps.get_db),
@@ -77,8 +49,44 @@ async def register(
 
     return new_user
 
+@router.post("/login", responses={
+    200: {"description": "Login successful", "content": {"application/json": {"example": {"message": "Login successful", "user_id": 1}}}},
+    401: {"description": "Invalid password", "content": {"application/json": {"example": {"detail": "Invalid password"}}}},
+    404: {"description": "User not found", "content": {"application/json": {"example": {"detail": "User not found"}}}},
+})
+async def login(
+        request: Request,
+        response: Response,
+        user_in: UserLogin,
+        db: Session = Depends(deps.get_db)
+):
+    """
+    Login a user using their username and password, set user_id in session.
+    """
+    user = db.query(UserModel).filter(UserModel.username == user_in.username).first()
 
-@router.post("/logout")
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if not verify_password(user_in.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid password"
+        )
+
+    # Store the user ID in the session to track the logged-in user
+    request.session["user_id"] = user.id
+    response.status_code = status.HTTP_200_OK
+    return {"message": "Login successful", "user_id": user.id}
+
+
+@router.post("/logout", responses={
+    200: {"description": "Successfully logged out", "content": {"application/json": {"example": {"message": "Successfully logged out"}}}},
+    400: {"description": "No active session to log out from", "content": {"application/json": {"example": {"detail": "No active session to log out from"}}}},
+})
 async def logout(request: Request):
     """
     Log out the user by clearing the session.

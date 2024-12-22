@@ -4,24 +4,21 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from app.core.security import get_password_hash
 from app.models.user import User as UserModel
-from tests.conftest import BaseTest
+from tests.conftest import BaseTest, create_user
 
 
 class TestAuth(BaseTest):
-    @pytest.fixture(scope="module")
-    def create_test_user(self, db: Session):
-        """Create a test user in the database."""
-        hashed_password = get_password_hash("Testpassword1!")
-        user = UserModel(
-            username="testuser",
-            email="testuser@example.com",
-            hashed_password=hashed_password,
-            is_active=True,
-        )
-        db.add(user)
+    @pytest.fixture(autouse=True)
+    def setup_and_teardown(self, db: Session):
+        # Setup: Ensure the database is clean before each test
+        db.query(UserModel).delete()
         db.commit()
-        db.refresh(user)
-        return user
+
+        self.create_test_user = create_user(db, "testuser", "testuser@example.com", "Testpassword1!")
+        yield
+        # Teardown: Clean up the database after each test
+        db.query(UserModel).delete()
+        db.commit()
 
     def test_register_success(self, client: TestClient, db):
         """Test successful user registration."""
@@ -38,13 +35,13 @@ class TestAuth(BaseTest):
         assert response_data["username"] == "newuser"
         assert "id" in response_data
 
-    def test_register_existing_username_or_email(self, client: TestClient, create_test_user: UserModel):
+    def test_register_existing_username_or_email(self, client: TestClient):
         """Test registering with existing username or email."""
         # Existing username
         response = client.post(
             "/auth/register",
             json={
-                "username": create_test_user.username,
+                "username": self.create_test_user.username,
                 "email": "uniqueemail@example.com",
                 "password": "Strongpassword1!"
             }
@@ -57,7 +54,7 @@ class TestAuth(BaseTest):
             "/auth/register",
             json={
                 "username": "uniqueusername",
-                "email": create_test_user.email,
+                "email": self.create_test_user.email,
                 "password": "Strongpassword1!"
             }
         )
@@ -123,23 +120,23 @@ class TestAuth(BaseTest):
         assert response.status_code == 422
         assert any("value is not a valid email address" in item["msg"] for item in response.json()["detail"])
 
-    def test_login_success(self, client: TestClient, create_test_user: UserModel):
+    def test_login_success(self, client: TestClient):
         """Test successful user login."""
         response = client.post(
             "/auth/login",
-            json={"username": create_test_user.username, "password": "Testpassword1!"}
+            json={"username": self.create_test_user.username, "password": "Testpassword1!"}
         )
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["message"] == "Login successful"
         assert "user_id" in response_data
 
-    def test_login_invalid_credentials(self, client: TestClient, create_test_user: UserModel):
+    def test_login_invalid_credentials(self, client: TestClient):
         """Test login with invalid credentials."""
         # Invalid password
         response = client.post(
             "/auth/login",
-            json={"username": create_test_user.username, "password": "wrongpassword"}
+            json={"username": self.create_test_user.username, "password": "wrongpassword"}
         )
         assert response.status_code == 401
         assert response.json()["detail"] == "Invalid password"
@@ -160,12 +157,12 @@ class TestAuth(BaseTest):
         )
         assert response.status_code == 422
 
-    def test_logout(self, client: TestClient, create_test_user: UserModel):
+    def test_logout(self, client: TestClient):
         """Test user logout."""
         # Login first
         login_response = client.post(
             "/auth/login",
-            json={"username": create_test_user.username, "password": "Testpassword1!"}
+            json={"username": self.create_test_user.username, "password": "Testpassword1!"}
         )
         assert login_response.status_code == 200
 

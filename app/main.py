@@ -1,18 +1,21 @@
-from fastapi import FastAPI
+import threading
+
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import create_engine
+from fastapi.lifespan import Lifespan
+
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
 import psycopg2
-from sqlalchemy.orm import sessionmaker
+
+from app.deployment_scheduler import deployment_scheudler
 
 
 # Function to create database if it doesn't exist
 def create_database_if_not_exists():
-    # Connect to the PostgreSQL server using settings from config.py
     conn = psycopg2.connect(
         dbname="postgres",  # Connect to the default 'postgres' database
         user=settings.POSTGRES_USER,
@@ -23,19 +26,14 @@ def create_database_if_not_exists():
     conn.autocommit = True  # Enable autocommit for database creation
 
     try:
-        # Create a cursor object
         cur = conn.cursor()
-
-        # Check if the 'cluster_management' database exists
         cur.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (settings.POSTGRES_DB,))
         exists = cur.fetchone()
 
         if not exists:
-            # If the database does not exist, create it
             cur.execute(f"CREATE DATABASE {settings.POSTGRES_DB}")
             print(f"Database '{settings.POSTGRES_DB}' created successfully.")
 
-        # Close the cursor and connection
         cur.close()
         conn.close()
 
@@ -44,8 +42,26 @@ def create_database_if_not_exists():
         if conn:
             conn.close()
 
+# Function to start the background worker
+def start_deployment_scheduler():
+    thread = threading.Thread(target=deployment_scheudler)
+    thread.daemon = True  # Set as daemon so it exits when the app shuts down
+    thread.start()
 
-# Create the FastAPI app
+# Define the lifespan function
+async def lifespan():
+    # Startup logic
+    create_database_if_not_exists()
+    Base.metadata.create_all(bind=engine)
+
+    # Start the background worker in a separate thread
+    start_deployment_scheduler()
+
+    yield
+    # Shutdown logic (if any)
+
+
+# Create the FastAPI app with lifespan
 app = FastAPI(
     title="Cluster Management API",
     description="""
@@ -60,7 +76,8 @@ app = FastAPI(
     """,
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Configure CORS and Session
@@ -86,15 +103,6 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
-
-@app.on_event("startup")
-async def startup():
-    # First, create the database if it doesn't exist
-    create_database_if_not_exists()
-
-    # Now, create the tables in the database
-    Base.metadata.create_all(bind=engine)
 
 
 if __name__ == "__main__":

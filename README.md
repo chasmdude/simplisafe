@@ -6,30 +6,30 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 ## Assessment Tasks
 
 ### 1. User Authentication and Organization Management
-- [ ] Implement session-based user authentication (login/logout)
-- [ ] Complete user registration with password hashing
-- [ ] Add organization creation with random invite codes
-- [ ] Implement organization joining via invite codes
+- [x] Implement session-based user authentication (login/logout)
+- [x] Complete user registration with password hashing
+- [x] Add organization creation with random invite codes
+- [x] Implement organization joining via invite codes
 
 ### 2. Cluster Management
-- [ ] Create clusters with resource limits (CPU, RAM, GPU)
-- [ ] Implement resource tracking and availability
-- [ ] Add cluster listing for organization members
-- [ ] Validate resource constraints
+- [x] Create clusters with resource limits (CPU, RAM, GPU)
+- [x] Implement resource tracking and availability
+- [x] Add cluster listing for organization members
+- [x] Validate resource constraints
 
 ### 3. Deployment Management
-- [ ] Develop a preemption-based scheduling algorithm to prioritize high-priority deployments
-- [ ] Create deployment endpoints with resource requirements
-- [ ] Implement basic scheduling algorithm
-- [ ] Add deployment status tracking
-- [ ] Handle resource allocation/deallocation
+- [x] Develop a preemption-based scheduling algorithm to prioritize high-priority deployments
+- [x] Create deployment endpoints with resource requirements
+- [x] Implement basic scheduling algorithm
+- [x] Add deployment status tracking
+- [x] Handle resource allocation/deallocation
 
 ### 4. Advanced Features (Optional)
 - [ ] Add support for deployment dependency management (e.g., Deployment A must complete before Deployment B starts)
-- [ ] Implement Role-Based Access Control (RBAC)
+- [x] Implement Role-Based Access Control (RBAC)
 - [ ] Add rate limiting
-- [ ] Create comprehensive test coverage
-- [ ] Enhance API documentation
+- [x] Create comprehensive test coverage
+- [x] Enhance API documentation
 
 ## Project Structure
 ```
@@ -49,11 +49,13 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 │   │   └── security.py # Security functions
 │   ├── db
 │   │   ├── base.py    # Database setup
+|   |   ├── base_class.py # Custom base class for SQLAlchemy models
 │   │   └── session.py # Database session
 │   ├── models         # SQLAlchemy models
 │   │   ├── cluster.py
 │   │   ├── deployment.py
 │   │   ├── organization.py
+|   |   |── organization_member.py # Organization member model
 │   │   └── user.py
 │   ├── schemas       # Pydantic schemas
 │   │   ├── cluster.py
@@ -63,7 +65,9 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 │   └── main.py      # Application entry point
 └── tests
     ├── conftest.py  # Test configuration
-    └── test_api     # API tests
+    └── test_auth.py # Authentication tests
+    └── test_organizations.py # Organization management tests
+    └── test_clusters.py # Cluster management tests
 ```
 
 ## Authentication Flow
@@ -79,37 +83,19 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 3. Members join using invite code
 4. Access organization resources (clusters, deployments)
 
-## Testing
-Run the test suite:
-```bash
-pytest
-```
+## Cluster Management
+1. create clusters with resource limits (CPU, RAM, GPU)
+2. Clusters are created under organization of user
+2. List clusters for organization members
 
-## Evaluation Criteria
-
-### 1. Code Quality (40%)
-- Clean, readable, and well-organized code
-- Proper error handling
-- Effective use of FastAPI features
-- Type hints and validation
-
-### 2. System Design (30%)
-- Authentication implementation
-- Resource management approach
-- Scheduling algorithm design
-- API structure
-
-### 3. Functionality (20%)
-- Working authentication system
-- Proper resource tracking
-- Successful deployment scheduling
-- Error handling
-
-### 4. Testing & Documentation (10%)
-- Test coverage
-- API documentation
-- Code comments
-- README completeness
+## Deployment Management**
+1. Create a deployment for any cluster by providing a Docker image path, resource requirements (CPU, RAM, GPU), and priority.
+2. Resource Allocation for Deployment**: Each deployment requires a certain amount of resources (RAM, CPU, GPU).
+3. Queue Deployments**: The deployment should be queued if the resources are unavailable in the cluster.
+4. Preemption: Implemented a preemption-based scheduling algorithm to prioritize high-priority deployments.
+5. Deployment Status Tracking: Track the status of each deployment (Queued, Running, Completed, Failed).
+6. Resource Deallocation: Deallocate resources once the deployment is completed or failed.
+7. Redis Integration: Using Redis for deployment queue and resource tracking.
 
 ## Getting Started
 
@@ -139,6 +125,12 @@ SESSION_MAX_AGE=1800        # Session duration in seconds (30 minutes)
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+## Testing
+Run the test suite:
+```bash
+pytest
+```
+
 4. Access the API documentation:
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
@@ -148,3 +140,29 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - Use appropriate error handling throughout
 - Document your design decisions
 - Consider edge cases in your implementation
+
+## Evaluation Criteria
+
+### 1. Code Quality (40%)
+- Clean, readable, and well-organized code
+- Proper error handling
+- Effective use of FastAPI features
+- Type hints and validation
+
+### 2. System Design (30%)
+- Authentication implementation
+- Resource management approach
+- Scheduling algorithm design
+- API structure
+
+### 3. Functionality (20%)
+- Working authentication system
+- Proper resource tracking
+- Successful deployment scheduling
+- Error handling
+
+### 4. Testing & Documentation (10%)
+- Test coverage
+- API documentation
+- Code comments
+- README completeness
