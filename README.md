@@ -6,30 +6,32 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 ## Assessment Tasks
 
 ### 1. User Authentication and Organization Management
-- [x] Implement session-based user authentication (login/logout)
-- [x] Complete user registration with password hashing
-- [x] Add organization creation with random invite codes
-- [x] Implement organization joining via invite codes
+- ✅ Implement session-based user authentication (login/logout)
+- ✅ Complete user registration with password hashing
+- ✅ Add organization creation with random invite codes
+- ✅ Implement organization joining via invite codes
 
 ### 2. Cluster Management
-- [x] Create clusters with resource limits (CPU, RAM, GPU)
-- [x] Implement resource tracking and availability
-- [x] Add cluster listing for organization members
-- [x] Validate resource constraints
+- ✅ Create clusters with resource limits (CPU, RAM, GPU)
+- ✅ Implement resource tracking and availability
+- ✅ Add cluster listing for organization members
+- ✅ Validate resource constraints
 
 ### 3. Deployment Management
-- [x] Develop a preemption-based scheduling algorithm to prioritize high-priority deployments
-- [x] Create deployment endpoints with resource requirements
-- [x] Implement basic scheduling algorithm
-- [x] Add deployment status tracking
-- [x] Handle resource allocation/deallocation
+- ✅ Develop a preemption-based scheduling algorithm to prioritize high-priority deployments
+- ✅ Create deployment endpoints with resource requirements
+- ✅ Implement basic scheduling algorithm
+- ✅ Add deployment status tracking
+- ✅ Handle resource allocation/deallocation
 
 ### 4. Advanced Features (Optional)
-- [ ] Add support for deployment dependency management (e.g., Deployment A must complete before Deployment B starts)
-- [x] Implement Role-Based Access Control (RBAC)
-- [ ] Add rate limiting
-- [x] Create comprehensive test coverage
-- [x] Enhance API documentation
+- ❌ Add support for deployment dependency management (e.g., Deployment A must complete before Deployment B starts)
+- Above feature can be implemented using a DAG (Directed Acyclic Graph) for deployment dependencies.
+- ✅ Implement Role-Based Access Control (RBAC)
+- ❌ Add rate limiting
+- Above feature can be implemented using FastAPI's built-in rate limiting middleware.
+- ✅ Create comprehensive test coverage
+- ✅ Enhance API documentation
 
 ## Project Structure
 ```
@@ -109,17 +111,6 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 pip install -r requirements.txt
 ```
 
-2. Set up environment variables:
-```bash
-# Database Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
-
-# Session Configuration
-SECRET_KEY=your-secret-key  # For secure session encryption
-SESSION_COOKIE_NAME=session  # Cookie name for the session
-SESSION_MAX_AGE=1800        # Session duration in seconds (30 minutes)
-```
-
 3. Run the application:
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -128,12 +119,29 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ## Testing
 Run the test suite:
 ```bash
-pytest
+pytest --disable-warnings
 ```
 
-4. Access the API documentation:
+## API Docs
+Access the Updated Interactive API documentations:
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+## Design
+- The application uses FastAPI for building the RESTful API.
+- SQLAlchemy is used for database management.
+- Pydantic is used for data validation and serialization.
+- Redis is used for deployment queue and resource tracking.
+- The application uses session-based authentication.
+- The application uses a preemption-based scheduling algorithm for deployment prioritization.
+- The application uses Role-Based Access Control (RBAC) for user permissions.
+- Since the application is a prototype, the deployment queue is managed in-memory using a list.
+- ### Decisions
+- The application uses a custom base class for SQLAlchemy models to avoid code duplication.
+- Organization members are stored in a separate table to manage user roles and permissions.
+- Deployment of only same cluster are queued and prioritized while deployments of different clusters are independent.
+- Hence, the application uses a single deployment queue for each cluster achieving the decoupling and parallelism for processing deployments for clusters 
+
 
 ## Notes
 - Focus on implementing core features first

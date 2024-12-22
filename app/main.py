@@ -1,13 +1,17 @@
-from fastapi import FastAPI
+import threading
+
+from fastapi import FastAPI, Depends
+
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import create_engine
+
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
 import psycopg2
-from sqlalchemy.orm import sessionmaker
+
+from app.deployment_scheduler import start_periodic_task
 
 
 # Function to create database if it doesn't exist
@@ -50,6 +54,7 @@ async def lifespan(app: FastAPI):
     create_database_if_not_exists()
     Base.metadata.create_all(bind=engine)
 
+    # Start the background worker in a separate thread
     # start_periodic_task()
 
     yield

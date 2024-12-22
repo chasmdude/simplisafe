@@ -110,7 +110,6 @@ def create_deployment(
 @router.get("/", response_model=List[Deployment], responses={
     200: {"description": "List of deployments for the user's organization", "content": {"application/json": {"example": [{"id": 1, "name": "Deployment1", "docker_image": "my_image", "cpu_required": 2, "ram_required": 4, "gpu_required": 1, "priority": 1, "status": "running", "cluster_id": 1}]}}},
     400: {"description": "User is not part of any organization", "content": {"application/json": {"example": {"detail": "User is not part of any organization"}}}},
-    404: {"description": "No deployments found", "content": {"application/json": {"example": {"detail": "No deployments found for your organization"}}}},
 })
 def list_deployments(
         db: Session = Depends(deps.get_db),
@@ -126,7 +125,7 @@ def list_deployments(
         )
 
     deployments = db.query(DeploymentModel).join(Cluster).filter(
-        Cluster.organization_id == current_user.organization.id
+        Cluster.organization_id == current_user.organization.organization_id
     ).all()
 
     return deployments
