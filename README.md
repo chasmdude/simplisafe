@@ -106,12 +106,28 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 - PostgreSQL database
 
 ### Setup Instructions
-1. Install dependencies:
+
+1. Create a virtual environment:
+```bash
+python3 -m venv .venv
+```
+2. Activate the virtual environment:
+   - On macOS and Linux:
+   ```bash
+   source .venv/bin/activate
+    ```
+   - On Windows:
+   ```bash:
+   .\.venv\Scripts\activate
+    ```
+#### Note: If you encounter "command not found" Error, Make sure to activate the virtual environment before running following commands
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the application:
+4. Run the application:
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
