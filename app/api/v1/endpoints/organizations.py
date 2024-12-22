@@ -23,7 +23,7 @@ def check_if_user_is_already_a_member(current_user, db):
         )
 
 @router.post("/", response_model=Organization, responses={
-    201: {"description": "Organization created successfully", "content": {"application/json": {"example": {"id": 1, "name": "MyOrganization", "invite_code": "ABC123"}}}},
+    200: {"description": "Organization created successfully", "content": {"application/json": {"example": {"id": 1, "name": "MyOrganization", "invite_code": "ABC123"}}}},
     400: {"description": "User is already part of an organization", "content": {"application/json": {"example": {"detail": "You are already part of an organization: MyOrganization, Admin: adminuser"}}}},
 })
 def create_organization(

@@ -1,8 +1,5 @@
 from typing import List
-
-import redis
 from fastapi import APIRouter, Depends, HTTPException, status
-from rq import Queue
 from sqlalchemy.orm import Session
 
 from app.core import deps
@@ -12,8 +9,8 @@ from app.models.user import User
 from app.schemas.deployment import Deployment, DeploymentCreate
 
 # Connect to Redis
-redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
-deployment_queue = Queue('deployment_queue', connection=redis_client)
+# redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+# deployment_queue = Queue('deployment_queue', connection=redis_client)
 
 router = APIRouter()
 
@@ -81,7 +78,7 @@ def create_deployment(
             # If resources are still not enough, queue the deployment
             deploy_status = DeploymentStatus.PENDING
             # Add the deployment to the Redis queue for this cluster
-            redis_client.rpush(f"deployment_queue_{deployment_in.cluster_id}", deployment_in.name)
+            # redis_client.rpush(f"deployment_queue_{deployment_in.cluster_id}", deployment_in.name)
 
         else:
             # If resources are freed, proceed with running the new deployment

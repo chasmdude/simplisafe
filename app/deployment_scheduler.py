@@ -13,57 +13,54 @@ from app.models.deployment import Deployment as DeploymentModel
 # Redis connection setup
 redis_client = redis.StrictRedis(host="localhost", port=6379, db=0)
 
-def deployment_scheudler():
-    while True:
-        task = redis_client.blpop("deployment_queue")  # Blocking pop from the queue
-        if task:
-            print(f"Processing task: {task[1].decode()}")
-            # Simulate task processing
-            time.sleep(5)  # Replace with actual task processing logic
-            print(f"Task completed: {task[1].decode()}")
-
-def process_deployment(deployment_in: DeploymentCreate):
-    db: Session = deps.get_db()
-
-    # Retrieve cluster from database
-    cluster = db.query(Cluster).filter(Cluster.id == deployment_in.cluster_id).first()
-    if not cluster:
-        print(f"Cluster not found: {deployment_in.cluster_id}")
-        return
-
-    # Check if resources are available
-    if (
-            cluster.cpu_available >= deployment_in.cpu_required
-            and cluster.ram_available >= deployment_in.ram_required
-            and cluster.gpu_available >= deployment_in.gpu_required
-    ):
-        # Allocate resources and mark the deployment as running
-        cluster.cpu_available -= deployment_in.cpu_required
-        cluster.ram_available -= deployment_in.ram_required
-        cluster.gpu_available -= deployment_in.gpu_required
-        deploy_status = DeploymentStatus.RUNNING
-    else:
-        deploy_status = DeploymentStatus.PENDING
-        # Optionally retry the deployment after some time
-        sleep(10)
-        return process_deployment(deployment_in)
-
-    # Create the deployment record
-    deployment = DeploymentModel(
-        name=deployment_in.name,
-        docker_image=deployment_in.docker_image,
-        cpu_required=deployment_in.cpu_required,
-        ram_required=deployment_in.ram_required,
-        gpu_required=deployment_in.gpu_required,
-        priority=deployment_in.priority,
-        status=deploy_status,
-        cluster_id=deployment_in.cluster_id,
-    )
-    db.add(deployment)
-    db.commit()
-    db.refresh(deployment)
-
-    return deployment
+# def deployment_scheudler():
+#     while True:
+#         task = redis_client.blpop("deployment_queue")  # Blocking pop from the queue
+#         if task:
+#             print(f"Processing task: {task[1].decode()}")
+#             # Simulate task processing
+#             time.sleep(5)  # Replace with actual task processing logic
+#             print(f"Task completed: {task[1].decode()}")
+#
+# def process_deployment(deployment_in: DeploymentCreate):
+#     db: Session = deps.get_db()
+#
+#     # Retrieve cluster from database
+#     cluster = db.query(Cluster).filter(Cluster.id == deployment_in.cluster_id).first()
+#     if not cluster:
+#         print(f"Cluster not found: {deployment_in.cluster_id}")
+#         return
+#
+#     # Check if resources are available
+#     if (
+#             cluster.cpu_available >= deployment_in.cpu_required
+#             and cluster.ram_available >= deployment_in.ram_required
+#             and cluster.gpu_available >= deployment_in.gpu_required
+#     ):
+#         # Allocate resources and mark the deployment as running
+#         cluster.cpu_available -= deployment_in.cpu_required
+#         cluster.ram_available -= deployment_in.ram_required
+#         cluster.gpu_available -= deployment_in.gpu_required
+#         deploy_status = DeploymentStatus.RUNNING
+#     else:
+#         deploy_status = DeploymentStatus.PENDING
+#
+#     # Create the deployment record
+#     deployment = DeploymentModel(
+#         name=deployment_in.name,
+#         docker_image=deployment_in.docker_image,
+#         cpu_required=deployment_in.cpu_required,
+#         ram_required=deployment_in.ram_required,
+#         gpu_required=deployment_in.gpu_required,
+#         priority=deployment_in.priority,
+#         status=deploy_status,
+#         cluster_id=deployment_in.cluster_id,
+#     )
+#     db.add(deployment)
+#     db.commit()
+#     db.refresh(deployment)
+#
+#     return deployment
 
 
 import redis
