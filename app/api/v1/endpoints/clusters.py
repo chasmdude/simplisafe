@@ -22,13 +22,13 @@ def create_cluster(
     Create a new cluster associated with the current user.
     """
     # Check if the user has an active organization
-    if not current_user.organization:
+    if not current_user.org_member:
         raise HTTPException(
             status_code=400,
             detail="User is not part of any organization"
         )
 
-    current_user_org_id = current_user.organization.organization_id
+    current_user_org_id = current_user.org_member.organization_id
 
     # Create a new Cluster instance with the provided resources and limits
     cluster = ClusterModel(
@@ -61,14 +61,14 @@ def list_clusters(
     List all clusters associated with the current user's organization.
     """
     # Check if the user has an active organization
-    if not current_user.organization:
+    if not current_user.org_member:
         raise HTTPException(
             status_code=400,
             detail="User is not part of any organization"
         )
 
     # Retrieve clusters for the user's organization
-    clusters = db.query(ClusterModel).filter(ClusterModel.organization_id == current_user.organization.organization_id).all()
+    clusters = db.query(ClusterModel).filter(ClusterModel.organization_id == current_user.org_member.organization_id).all()
 
     # if not clusters:
     #     raise HTTPException(

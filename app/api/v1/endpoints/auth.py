@@ -9,9 +9,20 @@ from app.schemas.user import UserCreate, User, UserLogin
 router = APIRouter()
 
 
-@router.post("/register", response_model=User, responses={
-    400: {"description": "Username or email already exists", "content": {"application/json": {"example": {"detail": "Username or email already exists"}}}},
-})
+@router.post("/register", response_model=User,
+             responses={
+                 400: {
+                     "description": "Username or email already exists",
+                     "content": {
+                         "application/json": {
+                             "example": {
+                                 "detail": "Username or email already exists"
+                             }
+                         }
+                     }
+                 },
+             }
+             )
 async def register(
         *,
         db: Session = Depends(deps.get_db),
@@ -49,9 +60,12 @@ async def register(
 
     return new_user
 
+
 @router.post("/login", responses={
-    200: {"description": "Login successful", "content": {"application/json": {"example": {"message": "Login successful", "user_id": 1}}}},
-    401: {"description": "Invalid password", "content": {"application/json": {"example": {"detail": "Invalid password"}}}},
+    200: {"description": "Login successful",
+          "content": {"application/json": {"example": {"message": "Login successful", "user_id": 1}}}},
+    401: {"description": "Invalid password",
+          "content": {"application/json": {"example": {"detail": "Invalid password"}}}},
     404: {"description": "User not found", "content": {"application/json": {"example": {"detail": "User not found"}}}},
 })
 async def login(
@@ -84,8 +98,10 @@ async def login(
 
 
 @router.post("/logout", responses={
-    200: {"description": "Successfully logged out", "content": {"application/json": {"example": {"message": "Successfully logged out"}}}},
-    400: {"description": "No active session to log out from", "content": {"application/json": {"example": {"detail": "No active session to log out from"}}}},
+    200: {"description": "Successfully logged out",
+          "content": {"application/json": {"example": {"message": "Successfully logged out"}}}},
+    400: {"description": "No active session to log out from",
+          "content": {"application/json": {"example": {"detail": "No active session to log out from"}}}},
 })
 async def logout(request: Request):
     """

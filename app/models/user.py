@@ -10,5 +10,5 @@ class User(Base):
     is_active = Column(Boolean, default=True)
 
     # Relationships
-    organization = relationship("OrganizationMember", back_populates="user", cascade="all, delete-orphan", uselist=False)
+    org_member = relationship("OrganizationMember", back_populates="user", cascade="all, delete-orphan", uselist=False)
 

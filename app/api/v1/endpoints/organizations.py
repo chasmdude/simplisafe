@@ -9,6 +9,7 @@ from app.models.organization_member import OrganizationMember
 
 router = APIRouter()
 
+
 def check_if_user_is_already_a_member(current_user, db):
     existing_member = db.query(OrganizationMember).filter(OrganizationMember.user_id == current_user.id).first()
     if existing_member:
@@ -22,9 +23,12 @@ def check_if_user_is_already_a_member(current_user, db):
             detail=f"You are already part of an organization: {existing_org.name}, Admin: {admin_user.username}"
         )
 
+
 @router.post("/", response_model=Organization, responses={
-    200: {"description": "Organization created successfully", "content": {"application/json": {"example": {"id": 1, "name": "MyOrganization", "invite_code": "ABC123"}}}},
-    400: {"description": "User is already part of an organization", "content": {"application/json": {"example": {"detail": "You are already part of an organization: MyOrganization, Admin: adminuser"}}}},
+    200: {"description": "Organization created successfully",
+          "content": {"application/json": {"example": {"id": 1, "name": "MyOrganization", "invite_code": "ABC123"}}}},
+    400: {"description": "User is already part of an organization", "content": {"application/json": {
+        "example": {"detail": "You are already part of an organization: MyOrganization, Admin: adminuser"}}}},
 })
 def create_organization(
         *,
@@ -42,12 +46,15 @@ def create_organization(
     organization = OrganizationModel(name=organization_in.name, invite_code=invite_code)
     db.add(organization)
     db.commit()
-    db.refresh(organization)
+    # db.refresh(organization)
 
     # Add the current user as the first member/admin
     organization_member = OrganizationMember(user_id=current_user.id, organization_id=organization.id, role="admin")
     db.add(organization_member)
     db.commit()
+    # db.refresh(organization_member)
+    # db.refresh(organization)
+    # db.refresh(current_user)
 
     # # Update the current_user's organization
     # current_user.organization = organization
@@ -59,9 +66,12 @@ def create_organization(
 
 
 @router.post("/{invite_code}/join", responses={
-    200: {"description": "Successfully joined the organization", "content": {"application/json": {"example": {"message": "Successfully joined the organization"}}}},
-    400: {"description": "User is already part of an organization", "content": {"application/json": {"example": {"detail": "You are already part of an organization: MyOrganization, Admin: adminuser"}}}},
-    404: {"description": "Organization not found", "content": {"application/json": {"example": {"detail": "Organization not found"}}}},
+    200: {"description": "Successfully joined the organization",
+          "content": {"application/json": {"example": {"message": "Successfully joined the organization"}}}},
+    400: {"description": "User is already part of an organization", "content": {"application/json": {
+        "example": {"detail": "You are already part of an organization: MyOrganization, Admin: adminuser"}}}},
+    404: {"description": "Organization not found",
+          "content": {"application/json": {"example": {"detail": "Organization not found"}}}},
 })
 def join_organization(
         *,
@@ -88,12 +98,13 @@ def join_organization(
     organization_member = OrganizationMember(user_id=current_user.id, organization_id=organization.id, role="member")
     db.add(organization_member)
     db.commit()
+    # db.refresh(organization_member)
+    # db.refresh(organization)
+    # db.refresh(current_user)
 
     # Update current_user's organization
     # current_user.organization = organization
     # current_user.organization_id = organization.id
     # db.commit()
-    # db.refresh(current_user)
 
     return {"message": "Successfully joined the organization"}
-

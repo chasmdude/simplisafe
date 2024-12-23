@@ -155,6 +155,7 @@ Access the Updated Interactive API documentations:
 - ### Decisions
 - The application uses a custom base class for SQLAlchemy models to avoid code duplication.
 - Organization members are stored in a separate table to manage user roles and permissions.
+- Scheduler is created as interface and implemented as PreemptiveScheduler for deployment prioritization.
 - Deployment of only same cluster are queued and prioritized while deployments of different clusters are independent.
 - Hence, the application uses a single deployment queue for each cluster achieving the decoupling and parallelism for processing deployments for clusters 
 

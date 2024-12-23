@@ -15,9 +15,11 @@ class DeploymentBase(BaseModel):
 class DeploymentCreate(DeploymentBase):
     cluster_id: int
 
-
 class DeploymentUpdate(DeploymentBase):
     pass
+
+class DeploymentStatusUpdate(BaseModel):
+    status: DeploymentStatus
 
 
 class Deployment(DeploymentBase):
