@@ -1,17 +1,15 @@
-import threading
-
-from fastapi import FastAPI, Depends
-
+import psycopg2
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
-import psycopg2
-
-from app.deployment_scheduler import start_periodic_task
 
 
 # Function to create database if it doesn't exist
@@ -48,17 +46,13 @@ def create_database_if_not_exists():
         if conn:
             conn.close()
 
+
 # Define the lifespan function
 async def lifespan(app: FastAPI):
     # Startup logic
     create_database_if_not_exists()
     Base.metadata.create_all(bind=engine)
-
-    # Start the background worker in a separate thread
-    # start_periodic_task()
-
     yield
-    # Shutdown logic (if any)
 
 
 # Create the FastAPI app with lifespan
@@ -96,13 +90,15 @@ app.add_middleware(
     max_age=settings.SESSION_MAX_AGE
 )
 
+app.add_middleware(SlowAPIMiddleware)
+
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
 
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+# Initialize the rate limiter with a global limit
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(429, _rate_limit_exceeded_handler)
 
 
 if __name__ == "__main__":

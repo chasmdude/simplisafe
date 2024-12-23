@@ -30,7 +30,7 @@ def check_if_user_is_already_a_member(current_user, db):
     400: {"description": "User is already part of an organization", "content": {"application/json": {
         "example": {"detail": "You are already part of an organization: MyOrganization, Admin: adminuser"}}}},
 })
-def create_organization(
+async def create_organization(
         *,
         db: Session = Depends(deps.get_db),
         organization_in: OrganizationCreate,
@@ -73,7 +73,7 @@ def create_organization(
     404: {"description": "Organization not found",
           "content": {"application/json": {"example": {"detail": "Organization not found"}}}},
 })
-def join_organization(
+async def join_organization(
         *,
         db: Session = Depends(deps.get_db),
         invite_code: str,

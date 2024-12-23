@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
+
 from sqlalchemy.orm import Session
-from app.models.deployment import Deployment as DeploymentModel
+
 from app.models.cluster import Cluster
+from app.models.deployment import Deployment as DeploymentModel
 from app.schemas.deployment import DeploymentCreate, DeploymentStatusUpdate
 
 
@@ -14,7 +16,8 @@ class Scheduler(ABC):
         pass
 
     @abstractmethod
-    def process_deployment_status_update(self, db: Session, deployment: DeploymentModel, status_update: DeploymentStatusUpdate):
+    def process_deployment_stopped_running(self, db: Session, deployment: DeploymentModel,
+                                                 status_update: DeploymentStatusUpdate):
         """
         process updated deployments to dealloc resources if applicable
         """

@@ -1,4 +1,5 @@
 # tests/conftest.py
+import time
 from typing import Generator
 
 import pytest
@@ -225,3 +226,22 @@ def test_base_path(client: TestClient):
     # Validate that the request URL starts with the base path
     expected_url = "/api/v1/users"  # Adjust this based on the endpoint you're testing
     assert response.request.url.path == expected_url
+
+
+def test_rate_limiting(client: TestClient, get_logged_in_test_user_cookies):
+    # Make requests within the rate limit
+    for _ in range(100):
+        response = client.get("health")
+        assert response.status_code == 200
+
+    # The next request should be rate limited
+    response = client.get("health/")
+    assert response.status_code == 429
+    assert response.json() == {'error': 'Rate limit exceeded: 100 per 1 minute'}
+
+    # Wait for the rate limit to reset
+    time.sleep(60)
+
+    # Make another request after the rate limit reset
+    response = client.get("health/")
+    assert response.status_code == 200

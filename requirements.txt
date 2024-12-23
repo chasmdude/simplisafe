@@ -16,3 +16,4 @@ starlette>=0.41.3
 rq
 redis~=5.2.1
 apscheduler
+slowapi
