@@ -7,3 +7,8 @@ api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
 api_router.include_router(organizations.router, prefix="/organizations", tags=["organizations"])
 api_router.include_router(clusters.router, prefix="/clusters", tags=["clusters"])
 api_router.include_router(deployments.router, prefix="/deployments", tags=["deployments"])
+
+
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy"}

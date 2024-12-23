@@ -3,6 +3,8 @@ from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.db.session import SessionLocal
+from app.schedulers.priority_preemption_scheduler import AdvancedScheduler
+
 
 def get_db() -> Generator:
     db = SessionLocal()
@@ -10,6 +12,7 @@ def get_db() -> Generator:
         yield db
     finally:
         db.close()
+
 
 async def get_current_user(
         request: Request,
@@ -46,3 +49,9 @@ async def get_current_user(
         )
 
     return user
+
+
+def get_scheduler():
+    # Create the scheduler instance
+    scheduler_instance = AdvancedScheduler()
+    return scheduler_instance

@@ -1,38 +1,97 @@
 # tests/conftest.py
+import time
+from typing import Generator
+
 import pytest
 from fastapi.testclient import TestClient
+from httpx import Cookies
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+
+from app.core.deps import get_db
+from app.core.security import get_password_hash
 from app.db.base import Base
 from app.main import app
-from app.core.deps import get_db
+from app.models.cluster import Cluster as ClusterModel
+from app.models.organization import Organization as OrganizationModel
 from app.models.organization_member import OrganizationMember
 from app.models.user import User as UserModel
-from app.models.organization import Organization as OrganizationModel
-from app.models.cluster import Cluster as ClusterModel
-from app.core.security import get_password_hash
 
 # Database setup for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Test User Data
+TEST_USER_NAME = "testuser"
+TEST_USER_PASSWORD = "TestPassword1!"
+TEST_USER_EMAIL = "testuser@email.com"
 
-def create_test_user_model(db, username: str, email: str, password: str) -> UserModel:
+# Test Organization Data
+TEST_ORG_NAME = "Test Organization"
+
+# Test Cluster Data
+TEST_CLUSTER_NAME = "Test Cluster"
+TEST_CLUSTER_CPU = 4.0
+TEST_CLUSTER_RAM = 16.0
+TEST_CLUSTER_GPU = 2.0
+
+
+@pytest.fixture
+def get_test_user(db: Session) -> UserModel:
+    """
+    Helper function to create a test user in the database for each test.
+    """
+    return create_user(db, TEST_USER_EMAIL, TEST_USER_PASSWORD, TEST_USER_NAME)
+
+
+@pytest.fixture
+def get_logged_in_test_user_cookies(db: Session, client: TestClient, get_test_user) -> Cookies:
+    """
+    Fixture to return cookies after logging in test user for each test.
+    """
+    return login_user(client, get_test_user.username, TEST_USER_PASSWORD)
+
+
+@pytest.fixture
+def get_logged_in_test_org_admin_cookies(db: Session, client: TestClient, get_test_org_admin) -> Cookies:
+    """
+    Fixture to return cookies after logging in test user for each test.
+    """
+    return login_user(client, get_test_org_admin.username, TEST_USER_PASSWORD)
+
+
+@pytest.fixture
+def get_test_org_admin(db: Session, get_test_user, get_test_org) -> UserModel:
     """
     Helper function to create a user in the database.
     """
-    hashed_password = get_password_hash(password)
-    user = UserModel(
-        username=username,
-        email=email,
-        hashed_password=hashed_password,
-        is_active=True,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+    add_user_to_org(db, get_test_org, get_test_user, role="admin")
+    return get_test_user
+
+
+@pytest.fixture
+def get_test_org_with_admin(db: Session, get_test_user, get_test_org) -> OrganizationModel:
+    """
+    Helper function to create a Test organization and add the user as an admin.
+    """
+    add_user_to_org(db, get_test_org, get_test_user, role="admin")
+    return get_test_org
+
+
+@pytest.fixture
+def get_test_org(db: Session) -> OrganizationModel:
+    org = create_org(db, TEST_ORG_NAME)
+    return org
+
+
+@pytest.fixture
+def get_test_cluster(db: Session, get_test_org_with_admin) -> ClusterModel:
+    org_id = get_test_org_with_admin.id
+    print(f"Creating cluster for organization ID: {org_id}")
+    cluster = create_cluster(db, org_id, TEST_CLUSTER_NAME, TEST_CLUSTER_CPU, TEST_CLUSTER_RAM, TEST_CLUSTER_GPU)
+    print(f"Created cluster: {cluster}")
+    return cluster
 
 
 def login_user(client: TestClient, username: str, password: str):
@@ -44,31 +103,25 @@ def login_user(client: TestClient, username: str, password: str):
     return response.cookies
 
 
-def create_organization_with_user_as_admin(db: Session, name: str, user_id: int) -> OrganizationModel:
-    """
-    Helper function to create an organization and add the user as an admin.
-    """
-    organization = create_test_org(db, name)
+def create_user(db: Session, email, plain_password, username):
+    hashed_password = get_password_hash(plain_password)
 
-    add_user_to_org(db, organization.id, user_id, role="admin")
-
-    return organization
-
-
-def add_user_to_org(db: Session, organization_id: int, user_id: int, role: str = "member"):
-    """
-    Helper function to add a user to an organization with a specific role.
-    """
-    organization_member = OrganizationMember(user_id=user_id, organization_id=organization_id, role=role)
-    db.add(organization_member)
+    user = UserModel(
+        username=username,
+        email=email,
+        hashed_password=hashed_password,
+        is_active=True,
+    )
+    db.add(user)
     db.commit()
 
+    return user
 
-def create_test_org(db, org_name="test-organization"):
+
+def create_org(db, org_name):
     organization = OrganizationModel(name=org_name, invite_code=OrganizationModel.generate_invite_code())
     db.add(organization)
     db.commit()
-    db.refresh(organization)
 
     return organization
 
@@ -89,41 +142,106 @@ def create_cluster(db, organization_id: int, name: str, cpu: float, ram: float, 
     )
     db.add(cluster)
     db.commit()
-    db.refresh(cluster)
+    db.refresh(cluster)  # Ensure relationships are loaded
+
     return cluster
 
 
-class CustomTestClient(TestClient):
-    def __init__(self, app_for_client, base_path: str, **kwargs):
-        super().__init__(app_for_client, **kwargs)
-        self.base_path = base_path
+def add_user_to_org(db: Session, organization: OrganizationModel, user: UserModel, role: str = "member"):
+    """
+    Helper function to add a user to an organization with a specific role. default role is "member".
+    """
+    organization_member = OrganizationMember(user_id=user.id, organization_id=organization.id, role=role)
+    db.add(organization_member)
+    db.commit()
 
-    def request(self, method: str, url: str, **kwargs):
-        url = f"{self.base_path}{url}"
-        return super().request(method, url, **kwargs)
+    db.refresh(organization)
+    db.refresh(user)
 
 
-class BaseTest:
-    base_path = "/api/v1"  # Set the base path here
+@pytest.fixture(scope="session", autouse=True)
+def setup_database():
+    """
+    Create all tables at the start of the test session and drop them afterward.
+    """
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
 
-    @pytest.fixture(scope="session")
-    def db(self):
-        """Create the database tables before tests and drop them after."""
-        Base.metadata.create_all(bind=engine)
-        yield TestingSessionLocal()
-        Base.metadata.drop_all(bind=engine)
 
-    @pytest.fixture(scope="session")
-    def client(self):
-        """Override the FastAPI dependency to use the test database session."""
+@pytest.fixture(scope="function", autouse=True)
+def db() -> Generator:
+    """
+    Fixture to setup and tear down a transaction for each test.
+    Automatically applied to all tests.
+    """
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
 
-        def override_get_db():
-            try:
-                db = TestingSessionLocal()
-                yield db
-            finally:
-                db.close()
+    try:
+        yield session  # Provide the session to the test
+    finally:
+        session.close()
+        transaction.rollback()  # Rollback the transaction after each test
+        connection.close()
 
-        app.dependency_overrides[get_db] = override_get_db
-        with CustomTestClient(app, self.base_path) as client:
-            yield client
+
+# Session-scoped fixture for creating the test client with overridden dependency
+@pytest.fixture(scope="session")
+def client_config() -> Generator:
+    """
+    Session-scoped fixture to configure the client (base path, etc.)
+    """
+    # Configure base path once for the whole session
+    with TestClient(app) as c:
+        c.base_url = "http://testserver/api/v1"
+        yield c
+
+
+# Function-scoped fixture for client that overrides the db session
+@pytest.fixture
+def client(client_config, db) -> Generator:
+    """
+    Function-scoped fixture to override the database session for each test.
+    """
+
+    # Override the `get_db` dependency to use the session from the db fixture
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    # Use the configured client from the session-scoped fixture
+    yield client_config
+
+
+def test_base_path(client: TestClient):
+    # Send a request to an endpoint, e.g., "/users"
+    response = client.get("/users")  # This should be automatically prefixed with "/api/v1"
+
+    # Validate that the request URL starts with the base path
+    expected_url = "/api/v1/users"  # Adjust this based on the endpoint you're testing
+    assert response.request.url.path == expected_url
+
+
+def test_rate_limiting(client: TestClient, get_logged_in_test_user_cookies):
+    # Make requests within the rate limit
+    for _ in range(100):
+        response = client.get("health")
+        assert response.status_code == 200
+
+    # The next request should be rate limited
+    response = client.get("health/")
+    assert response.status_code == 429
+    assert response.json() == {'error': 'Rate limit exceeded: 100 per 1 minute'}
+
+    # Wait for the rate limit to reset
+    time.sleep(60)
+
+    # Make another request after the rate limit reset
+    response = client.get("health/")
+    assert response.status_code == 200

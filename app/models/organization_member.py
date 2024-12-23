@@ -9,5 +9,5 @@ class OrganizationMember(Base):
     role = Column(String, default="member")  # Example: 'admin', 'member'
 
     # Relationships
-    user = relationship("User", back_populates="organization")
+    user = relationship("User", back_populates="org_member")
     organization = relationship("Organization", back_populates="members")

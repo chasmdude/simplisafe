@@ -1,12 +1,14 @@
 from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core import deps
 from app.models.cluster import Cluster
-from app.models.deployment import Deployment as DeploymentModel, DeploymentStatus
+from app.models.deployment import Deployment as DeploymentModel, DeploymentStatus, valid_state_transitions
 from app.models.user import User
-from app.schemas.deployment import Deployment, DeploymentCreate
+from app.schedulers.scheduler_interface import Scheduler
+from app.schemas.deployment import Deployment, DeploymentCreate, DeploymentStatusUpdate
 
 # Connect to Redis
 # redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
@@ -19,11 +21,12 @@ router = APIRouter()
     200: {"description": "Deployment created successfully", "content": {"application/json": {"example": {"id": 1, "name": "Deployment1", "docker_image": "my_image", "cpu_required": 2, "ram_required": 4, "gpu_required": 1, "priority": 1, "status": "running", "cluster_id": 1}}}},
     404: {"description": "Cluster not found", "content": {"application/json": {"example": {"detail": "Cluster not found"}}}},
 })
-def create_deployment(
+async def create_deployment(
         *,
         db: Session = Depends(deps.get_db),
         deployment_in: DeploymentCreate,
-        current_user: User = Depends(deps.get_current_user)
+        scheduler: Scheduler = Depends(deps.get_scheduler)
+
 ):
     """
     Create a deployment and add it to a cluster if resources are available.
@@ -36,74 +39,8 @@ def create_deployment(
             status_code=status.HTTP_404_NOT_FOUND, detail="Cluster not found"
         )
 
-    # Check if the cluster has enough resources
-    if (
-            cluster.cpu_available >= deployment_in.cpu_required
-            and cluster.ram_available >= deployment_in.ram_required
-            and cluster.gpu_available >= deployment_in.gpu_required
-    ):
-        # Allocate resources and mark the deployment as running
-        cluster.cpu_available -= deployment_in.cpu_required
-        cluster.ram_available -= deployment_in.ram_required
-        cluster.gpu_available -= deployment_in.gpu_required
-        deploy_status = DeploymentStatus.RUNNING
-    else:
-        # Attempt to preempt lower-priority deployments to free resources
-        preempted_deployments = db.query(DeploymentModel).filter(
-            DeploymentModel.cluster_id == deployment_in.cluster_id,
-            DeploymentModel.status == DeploymentStatus.RUNNING,
-            DeploymentModel.priority < deployment_in.priority  # Only preempt lower-priority deployments
-        ).order_by(DeploymentModel.priority.asc()).all()
-
-        resources_freed = False
-        for deployment in preempted_deployments:
-            # Check if preempted deployment can be stopped
-            if (
-                    cluster.cpu_available + deployment.cpu_required >= deployment_in.cpu_required
-                    and cluster.ram_available + deployment.ram_required >= deployment_in.ram_required
-                    and cluster.gpu_available + deployment.gpu_required >= deployment_in.gpu_required
-            ):
-                # Free resources by marking deployment as failed
-                deployment.status = DeploymentStatus.FAILED
-                cluster.cpu_available += deployment.cpu_required
-                cluster.ram_available += deployment.ram_required
-                cluster.gpu_available += deployment.gpu_required
-                db.commit()
-
-                # Once enough resources are freed, allocate to the new deployment
-                resources_freed = True
-                break
-
-        if not resources_freed:
-            # If resources are still not enough, queue the deployment
-            deploy_status = DeploymentStatus.PENDING
-            # Add the deployment to the Redis queue for this cluster
-            # redis_client.rpush(f"deployment_queue_{deployment_in.cluster_id}", deployment_in.name)
-
-        else:
-            # If resources are freed, proceed with running the new deployment
-            deploy_status = DeploymentStatus.RUNNING
-
-            # Allocate resources
-            cluster.cpu_available -= deployment_in.cpu_required
-            cluster.ram_available -= deployment_in.ram_required
-            cluster.gpu_available -= deployment_in.gpu_required
-
-    # Create the deployment record
-    deployment = DeploymentModel(
-        name=deployment_in.name,
-        docker_image=deployment_in.docker_image,
-        cpu_required=deployment_in.cpu_required,
-        ram_required=deployment_in.ram_required,
-        gpu_required=deployment_in.gpu_required,
-        priority=deployment_in.priority,
-        status=deploy_status,
-        cluster_id=deployment_in.cluster_id,
-    )
-    db.add(deployment)
-    db.commit()
-    db.refresh(deployment)
-
+    # Use the scheduler to handle deployment
+    deployment = scheduler.schedule(db, cluster, deployment_in)
     return deployment
 
 
@@ -111,21 +48,57 @@ def create_deployment(
     200: {"description": "List of deployments for the user's organization", "content": {"application/json": {"example": [{"id": 1, "name": "Deployment1", "docker_image": "my_image", "cpu_required": 2, "ram_required": 4, "gpu_required": 1, "priority": 1, "status": "running", "cluster_id": 1}]}}},
     400: {"description": "User is not part of any organization", "content": {"application/json": {"example": {"detail": "User is not part of any organization"}}}},
 })
-def list_deployments(
+async def list_deployments(
         db: Session = Depends(deps.get_db),
         current_user: User = Depends(deps.get_current_user)
 ):
     """
     List all deployments for the current user's organization.
     """
-    if not current_user.organization:
+    if not current_user.org_member:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User is not part of any organization"
         )
 
     deployments = db.query(DeploymentModel).join(Cluster).filter(
-        Cluster.organization_id == current_user.organization.organization_id
+        Cluster.organization_id == current_user.org_member.organization_id
     ).all()
 
     return deployments
+
+
+@router.patch("/{deployment_id}/status", response_model=Deployment, responses={
+    400: {"description": "Invalid status transition", "content": {"application/json": {"example": {"detail": "Invalid status transition from completed to failed"}}}},
+    404: {"description": "Deployment not found", "content": {"application/json": {"example": {"detail": "Deployment not found"}}}},
+})
+async def update_deployment_status(
+    *,
+    deployment_id: int,
+    status_update: DeploymentStatusUpdate,
+    db: Session = Depends(deps.get_db),
+    scheduler: Scheduler = Depends(deps.get_scheduler),
+):
+    """
+    Update the status of a deployment and deallocate resources if necessary.
+    """
+    # Fetch the deployment
+    deployment = db.query(DeploymentModel).filter(DeploymentModel.id == deployment_id).first()
+    if not deployment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Deployment not found"
+        )
+
+    if status_update.status not in valid_state_transitions[deployment.status]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status transition from {deployment.status} to {status_update.status}",
+        )
+
+    scheduler.process_deployment_stopped_running(db, deployment, status_update)
+
+    # Update the deployment status
+    deployment.status = status_update.status
+    db.commit()
+
+    return deployment

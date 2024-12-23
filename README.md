@@ -21,15 +21,17 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 - ✅ Develop a preemption-based scheduling algorithm to prioritize high-priority deployments
 - ✅ Create deployment endpoints with resource requirements
 - ✅ Implement basic scheduling algorithm
+- ✅ Implement Priority, Preemption based scheduling algorithm 
 - ✅ Add deployment status tracking
 - ✅ Handle resource allocation/deallocation
 
 ### 4. Advanced Features (Optional)
-- ❌ Add support for deployment dependency management (e.g., Deployment A must complete before Deployment B starts)
-- Above feature can be implemented using a DAG (Directed Acyclic Graph) for deployment dependencies.
-- ✅ Implement Role-Based Access Control (RBAC)
-- ❌ Add rate limiting
-- Above feature can be implemented using FastAPI's built-in rate limiting middleware.
+- 💡 Add support for deployment dependency management (e.g., Deployment A must complete before Deployment B starts)
+  - Above feature can be implemented using a DAG (Directed Acyclic Graph) for deployment dependencies.
+  - Kahn's Algorithm can be used to implement the topological sorting of the DAG. 
+  - Current Implementation of priority based scheduling for each cluster shall be extended to use kahn's algorithm
+- ✅ Implement Basic Role-Based Access Control (RBAC)
+- ✅ Add rate limiting
 - ✅ Create comprehensive test coverage
 - ✅ Enhance API documentation
 
@@ -40,36 +42,45 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 │   ├── api
 │   │   └── v1
 │   │       ├── endpoints
-│   │       │   ├── auth.py        # Authentication endpoints
-│   │       │   ├── clusters.py    # Cluster management
-│   │       │   ├── deployments.py # Deployment handling
-│   │       │   └── organizations.py # Organization management
+│   │       │   ├── auth.py                # Authentication endpoints
+│   │       │   ├── clusters.py            # Cluster management
+│   │       │   ├── deployments.py         # Deployment handling
+│   │       │   └── organizations.py       # Organization management
 │   │       └── api.py
 │   ├── core
-│   │   ├── config.py   # Configuration settings
-│   │   ├── deps.py     # Dependencies and utilities
-│   │   └── security.py # Security functions
+│   │   ├── config.py                      # Configuration settings
+│   │   ├── deps.py                        # Dependencies and utilities
+│   │   └── security.py                    # Security functions
 │   ├── db
-│   │   ├── base.py    # Database setup
-|   |   ├── base_class.py # Custom base class for SQLAlchemy models
-│   │   └── session.py # Database session
-│   ├── models         # SQLAlchemy models
+│   │   ├── base.py                        # Database setup
+│   │   ├── base_class.py                  # Custom base class for SQLAlchemy models
+│   │   └── session.py                     # Database session
+│   ├── models                             # SQLAlchemy models
 │   │   ├── cluster.py
 │   │   ├── deployment.py
 │   │   ├── organization.py
-|   |   |── organization_member.py # Organization member model
+│   │   ├── organization_member.py         # Organization member model
 │   │   └── user.py
-│   ├── schemas       # Pydantic schemas
+│   ├── scheduler
+│   │   ├── scheduler.py                   # Scheduler interface
+│   │   └── preemptive_scheduler.py        # Preemptive scheduler implementation
+│   ├── schemas                            # Pydantic schemas
 │   │   ├── cluster.py
 │   │   ├── deployment.py
 │   │   ├── organization.py
 │   │   └── user.py
-│   └── main.py      # Application entry point
-└── tests
-    ├── conftest.py  # Test configuration
-    └── test_auth.py # Authentication tests
-    └── test_organizations.py # Organization management tests
-    └── test_clusters.py # Cluster management tests
+│   └── main.py                            # Application entry point
+├── tests
+│   ├── conftest.py                        # Test configuration
+│   ├── test_api                           # API tests
+│   │   ├── test_auth.py                   # Authentication tests
+│   │   ├── test_clusters.py               # Cluster management tests
+│   │   ├── test_deployments.py            # Deployment management tests
+│   │   └── test_organizations.py          # Organization management tests
+├── project.toml                           # Poetry project file
+├── README.md                              # Project documentation
+└── requirements.txt                       # Python dependencies
+  
 ```
 
 ## Authentication Flow
@@ -97,7 +108,6 @@ This is a FastAPI-based technical assessment designed to evaluate backend system
 4. Preemption: Implemented a preemption-based scheduling algorithm to prioritize high-priority deployments.
 5. Deployment Status Tracking: Track the status of each deployment (Queued, Running, Completed, Failed).
 6. Resource Deallocation: Deallocate resources once the deployment is completed or failed.
-7. Redis Integration: Using Redis for deployment queue and resource tracking.
 
 ## Getting Started
 
@@ -151,10 +161,11 @@ Access the Updated Interactive API documentations:
 - The application uses session-based authentication.
 - The application uses a preemption-based scheduling algorithm for deployment prioritization.
 - The application uses Role-Based Access Control (RBAC) for user permissions.
-- Since the application is a prototype, the deployment queue is managed in-memory using a list.
+- Since the application is a prototype, the deployment queue is managed in-memory
 - ### Decisions
 - The application uses a custom base class for SQLAlchemy models to avoid code duplication.
 - Organization members are stored in a separate table to manage user roles and permissions.
+- Scheduler is created as interface and implemented as PreemptiveScheduler for deployment prioritization.
 - Deployment of only same cluster are queued and prioritized while deployments of different clusters are independent.
 - Hence, the application uses a single deployment queue for each cluster achieving the decoupling and parallelism for processing deployments for clusters 
 
